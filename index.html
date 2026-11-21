@@ -110,6 +110,43 @@
     .card-title { font-size: 1.15rem; font-weight: 800; margin-bottom: 0.25rem; }
     .card-subtitle { font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; }
 
+    /* Watch File Dropzone */
+    .dropzone {
+      border: 2px dashed #CBD5E1;
+      background: #F8FAFC;
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 1.1rem;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: #FEF2F2;
+    }
+    .dropzone-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--charcoal);
+      margin-bottom: 0.2rem;
+    }
+    .dropzone-sub {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .dropzone-badge {
+      display: inline-block;
+      margin-top: 0.45rem;
+      background: var(--charcoal);
+      color: #FFFFFF;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.22rem 0.6rem;
+      border-radius: 999px;
+    }
+
     .form-grid { display: grid; grid-template-columns: 1fr; gap: 0.85rem; }
     @media (min-width: 560px) {
       .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
@@ -351,7 +388,16 @@
     <section id="tab-log" class="tab-panel active">
       <div class="card">
         <div class="card-title">Log Your Run</div>
-        <p class="card-subtitle">Enter your Name &amp; 4-digit PIN so only you can unlock your diary later.</p>
+        <p class="card-subtitle">Import a watch file to auto-fill, or enter your run details manually below.</p>
+
+        <!-- WATCH FILE DROPZONE (.FIT / .GPX / .TCX) -->
+        <div id="watchDropzone" class="dropzone" onclick="document.getElementById('watchFileInput').click()">
+          <input type="file" id="watchFileInput" accept=".fit,.gpx,.tcx,.xml" style="display:none;" />
+          <div class="dropzone-title">⌚ Import Garmin / Watch File (.FIT, .GPX, .TCX)</div>
+          <div class="dropzone-sub">Tap to browse or drag &amp; drop an activity file—auto-fills Date, Time, GPS Weather &amp; Distance</div>
+          <span class="dropzone-badge">100% Private • Parsed Locally in Browser</span>
+        </div>
+        <div id="fileImportStatus" class="status-msg" style="margin-bottom:0.85rem;"></div>
 
         <form id="logForm" class="form-grid">
           <div class="form-grid-2">
@@ -375,21 +421,21 @@
               <input type="time" id="runTime" value="06:00" required />
             </div>
             <div class="loc-wrap">
-              <label for="runLocation">Town / Suburb *</label>
-              <input type="text" id="runLocation" placeholder="Type town (e.g. White River)" autocomplete="off" required />
+              <label for="runLocation">Town / GPS Pin *</label>
+              <input type="text" id="runLocation" placeholder="Type town or import file" autocomplete="off" required />
               <div id="locSuggestions" class="loc-suggestions"></div>
-              <a id="googleMapsPreviewLink" class="maps-link" href="https://www.google.com/maps/search/?api=1&query=White+River+South+Africa" target="_blank" rel="noopener">📍 Check on Google Maps</a>
+              <a id="googleMapsPreviewLink" class="maps-link" href="https://www.google.com/maps/search/?api=1&query=South+Africa" target="_blank" rel="noopener">📍 Check on Google Maps</a>
             </div>
           </div>
 
           <div class="form-grid-3">
             <div>
               <label for="runDistance">Distance (km) *</label>
-              <input type="number" id="runDistance" step="0.01" min="0.5" placeholder="e.g. 10.0" required />
+              <input type="number" id="runDistance" step="0.01" min="0.1" placeholder="e.g. 10.0" required />
             </div>
             <div>
               <label for="runMinutes">Minutes *</label>
-              <input type="number" id="runMinutes" min="1" placeholder="e.g. 58" required />
+              <input type="number" id="runMinutes" min="0" placeholder="e.g. 58" required />
             </div>
             <div>
               <label for="runSeconds">Seconds</label>
@@ -622,11 +668,301 @@
       loadDiary();
     }
 
-    // Helper: Safely parse pace even if Google Sheets formatted "6:04" as "1899-12-30T06:04:00.000Z"
+    // ==========================================
+    // GARMIN / WATCH FILE PARSER (.FIT, .GPX, .TCX)
+    // ==========================================
+    const dropzone = document.getElementById('watchDropzone');
+    const fileInput = document.getElementById('watchFileInput');
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropzone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+      dropzone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+      });
+    });
+    dropzone.addEventListener('drop', e => {
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleWatchFile(e.dataTransfer.files[0]);
+      }
+    });
+    fileInput.addEventListener('change', e => {
+      if (e.target.files && e.target.files[0]) {
+        handleWatchFile(e.target.files[0]);
+      }
+    });
+
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // Lightweight Binary FIT Parser (extracts session/record timestamp, distance, duration, start GPS)
+    function parseBinaryFit(arrayBuffer) {
+      const view = new DataView(arrayBuffer);
+      if (view.byteLength < 14) throw new Error("Invalid FIT file (too small).");
+      const headerSize = view.getUint8(0);
+      const dataSize = view.getUint32(4, true);
+      const sig = String.fromCharCode(view.getUint8(8), view.getUint8(9), view.getUint8(10), view.getUint8(11));
+      if (sig !== ".FIT") throw new Error("Not a valid binary .FIT file.");
+
+      const endOffset = Math.min(view.byteLength, headerSize + dataSize);
+      let offset = headerSize;
+      const localDefs = {};
+      const FIT_EPOCH_MS = Date.UTC(1989, 11, 31, 0, 0, 0);
+      const SEMICIRCLE_TO_DEG = 180 / Math.pow(2, 31);
+
+      let firstLat = null, firstLon = null;
+      let firstTimestamp = null, lastTimestamp = null;
+      let maxRecordDistM = 0;
+      let sessionDistM = null, sessionTimeS = null, sessionStartTime = null;
+
+      while (offset < endOffset) {
+        const header = view.getUint8(offset++);
+        if ((header & 0x80) === 0x80) {
+          const localType = (header >> 5) & 0x03;
+          const def = localDefs[localType];
+          if (!def) break;
+          offset += def.recordSize;
+          continue;
+        }
+
+        const isDef = (header & 0x40) === 0x40;
+        const hasDevFields = (header & 0x20) === 0x20;
+        const localType = header & 0x0F;
+
+        if (isDef) {
+          offset++; // reserved
+          const arch = view.getUint8(offset++);
+          const littleEndian = arch === 0;
+          const globalMsgNum = view.getUint16(offset, littleEndian);
+          offset += 2;
+          const numFields = view.getUint8(offset++);
+          const fields = [];
+          let recordSize = 0;
+          for (let i = 0; i < numFields; i++) {
+            const fieldNum = view.getUint8(offset++);
+            const size = view.getUint8(offset++);
+            const baseType = view.getUint8(offset++) & 0x1F;
+            fields.push({ fieldNum, size, baseType });
+            recordSize += size;
+          }
+          if (hasDevFields) {
+            const numDev = view.getUint8(offset++);
+            for (let i = 0; i < numDev; i++) {
+              offset++;
+              const devSize = view.getUint8(offset++);
+              offset++;
+              recordSize += devSize;
+            }
+          }
+          localDefs[localType] = { globalMsgNum, littleEndian, fields, recordSize };
+        } else {
+          const def = localDefs[localType];
+          if (!def || offset + def.recordSize > endOffset) break;
+          const le = def.littleEndian;
+          let fieldOffset = offset;
+
+          if (def.globalMsgNum === 18 || def.globalMsgNum === 20) {
+            for (const f of def.fields) {
+              if (def.globalMsgNum === 20) {
+                if (f.fieldNum === 253 && f.size === 4) {
+                  const ts = view.getUint32(fieldOffset, le);
+                  if (ts !== 0xFFFFFFFF && ts > 100000000) {
+                    if (!firstTimestamp) firstTimestamp = ts;
+                    lastTimestamp = ts;
+                  }
+                } else if (f.fieldNum === 0 && f.size === 4 && firstLat === null) {
+                  const rawLat = view.getInt32(fieldOffset, le);
+                  if (rawLat !== 0x7FFFFFFF) firstLat = rawLat * SEMICIRCLE_TO_DEG;
+                } else if (f.fieldNum === 1 && f.size === 4 && firstLon === null) {
+                  const rawLon = view.getInt32(fieldOffset, le);
+                  if (rawLon !== 0x7FFFFFFF) firstLon = rawLon * SEMICIRCLE_TO_DEG;
+                } else if (f.fieldNum === 5 && f.size === 4) {
+                  const d = view.getUint32(fieldOffset, le);
+                  if (d !== 0xFFFFFFFF) maxRecordDistM = Math.max(maxRecordDistM, d / 100);
+                }
+              } else if (def.globalMsgNum === 18) {
+                if (f.fieldNum === 2 && f.size === 4) {
+                  const ts = view.getUint32(fieldOffset, le);
+                  if (ts !== 0xFFFFFFFF && ts > 100000000) sessionStartTime = ts;
+                } else if (f.fieldNum === 7 && f.size === 4) {
+                  const t = view.getUint32(fieldOffset, le);
+                  if (t !== 0xFFFFFFFF) sessionTimeS = t / 1000;
+                } else if (f.fieldNum === 8 && f.size === 4 && !sessionTimeS) {
+                  const t = view.getUint32(fieldOffset, le);
+                  if (t !== 0xFFFFFFFF) sessionTimeS = t / 1000;
+                } else if (f.fieldNum === 9 && f.size === 4) {
+                  const d = view.getUint32(fieldOffset, le);
+                  if (d !== 0xFFFFFFFF) sessionDistM = d / 100;
+                } else if (f.fieldNum === 3 && f.size === 4 && firstLat === null) {
+                  const rawLat = view.getInt32(fieldOffset, le);
+                  if (rawLat !== 0x7FFFFFFF) firstLat = rawLat * SEMICIRCLE_TO_DEG;
+                } else if (f.fieldNum === 4 && f.size === 4 && firstLon === null) {
+                  const rawLon = view.getInt32(fieldOffset, le);
+                  if (rawLon !== 0x7FFFFFFF) firstLon = rawLon * SEMICIRCLE_TO_DEG;
+                }
+              }
+              fieldOffset += f.size;
+            }
+          }
+          offset += def.recordSize;
+        }
+      }
+
+      const startFitTs = sessionStartTime || firstTimestamp;
+      const startDateObj = startFitTs ? new Date(FIT_EPOCH_MS + startFitTs * 1000) : new Date();
+      const distKm = (sessionDistM || maxRecordDistM) / 1000;
+      const totalSec = sessionTimeS || (lastTimestamp && firstTimestamp ? (lastTimestamp - firstTimestamp) : 0);
+
+      if (distKm <= 0 || totalSec <= 0) {
+        throw new Error("Could not extract distance/time from this .FIT file. Try exporting as .GPX or .TCX from Garmin Connect.");
+      }
+
+      return { startDateObj, distKm, totalSec, lat: firstLat, lon: firstLon };
+    }
+
+    // XML Parser for .GPX and .TCX files
+    function parseXmlActivity(text) {
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, "text/xml");
+
+      const laps = xml.getElementsByTagName("Lap");
+      if (laps.length > 0) {
+        let totalSec = 0;
+        let totalMeters = 0;
+        let firstTimeStr = null;
+        for (const lap of laps) {
+          if (!firstTimeStr) firstTimeStr = lap.getAttribute("StartTime");
+          const tEl = lap.getElementsByTagName("TotalTimeSeconds")[0];
+          const dEl = lap.getElementsByTagName("DistanceMeters")[0];
+          if (tEl) totalSec += parseFloat(tEl.textContent) || 0;
+          if (dEl) totalMeters += parseFloat(dEl.textContent) || 0;
+        }
+        const latEl = xml.getElementsByTagName("LatitudeDegrees")[0];
+        const lonEl = xml.getElementsByTagName("LongitudeDegrees")[0];
+        const lat = latEl ? parseFloat(latEl.textContent) : null;
+        const lon = lonEl ? parseFloat(lonEl.textContent) : null;
+        const startDateObj = firstTimeStr ? new Date(firstTimeStr) : new Date();
+        return { startDateObj, distKm: totalMeters / 1000, totalSec, lat, lon };
+      }
+
+      const trkpts = Array.from(xml.getElementsByTagName("trkpt"));
+      if (trkpts.length < 2) {
+        throw new Error("No trackpoints found in GPX file.");
+      }
+
+      let distKm = 0;
+      let firstLat = null, firstLon = null;
+      let firstTime = null, lastTime = null;
+
+      for (let i = 0; i < trkpts.length; i++) {
+        const pt = trkpts[i];
+        const lat = parseFloat(pt.getAttribute("lat"));
+        const lon = parseFloat(pt.getAttribute("lon"));
+        const timeEl = pt.getElementsByTagName("time")[0];
+
+        if (i === 0) {
+          firstLat = lat;
+          firstLon = lon;
+        } else {
+          const prevLat = parseFloat(trkpts[i - 1].getAttribute("lat"));
+          const prevLon = parseFloat(trkpts[i - 1].getAttribute("lon"));
+          distKm += haversineKm(prevLat, prevLon, lat, lon);
+        }
+
+        if (timeEl && timeEl.textContent) {
+          const t = new Date(timeEl.textContent.trim());
+          if (!isNaN(t)) {
+            if (!firstTime) firstTime = t;
+            lastTime = t;
+          }
+        }
+      }
+
+      const totalSec = (firstTime && lastTime) ? (lastTime - firstTime) / 1000 : 0;
+      return {
+        startDateObj: firstTime || new Date(),
+        distKm,
+        totalSec,
+        lat: firstLat,
+        lon: firstLon
+      };
+    }
+
+    async function handleWatchFile(file) {
+      const statusEl = document.getElementById('fileImportStatus');
+      statusEl.className = 'status-msg info';
+      statusEl.textContent = `Reading ${file.name}...`;
+
+      try {
+        const ext = file.name.split('.').pop().toLowerCase();
+        let parsed;
+
+        if (ext === 'fit') {
+          const buf = await file.arrayBuffer();
+          parsed = parseBinaryFit(buf);
+        } else {
+          const txt = await file.text();
+          parsed = parseXmlActivity(txt);
+        }
+
+        const d = parsed.startDateObj;
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+
+        document.getElementById('runDate').value = `${yyyy}-${mm}-${dd}`;
+        document.getElementById('runTime').value = `${hh}:${min}`;
+        document.getElementById('runDistance').value = (Math.round(parsed.distKm * 100) / 100).toFixed(2);
+
+        const totalRoundedSec = Math.round(parsed.totalSec);
+        const mins = Math.floor(totalRoundedSec / 60);
+        const secs = totalRoundedSec % 60;
+        document.getElementById('runMinutes').value = mins;
+        document.getElementById('runSeconds').value = secs;
+
+        if (parsed.lat !== null && parsed.lon !== null && isFinite(parsed.lat) && isFinite(parsed.lon)) {
+          const latStr = parsed.lat.toFixed(4);
+          const lonStr = parsed.lon.toFixed(4);
+          selectedPlace = {
+            name: `GPS Start (${latStr}, ${lonStr})`,
+            country_code: '',
+            latitude: parsed.lat,
+            longitude: parsed.lon
+          };
+          document.getElementById('runLocation').value = `GPS (${latStr}, ${lonStr})`;
+          document.getElementById('googleMapsPreviewLink').href = `https://www.google.com/maps/search/?api=1&query=${parsed.lat},${parsed.lon}`;
+        }
+
+        statusEl.className = 'status-msg success';
+        statusEl.textContent = `Imported ${file.name}! (${(Math.round(parsed.distKm * 100) / 100)} km in ${mins}:${secs < 10 ? '0' : ''}${secs})`;
+
+        if (document.getElementById('runLocation').value.trim()) {
+          previewEffort();
+        }
+      } catch (err) {
+        statusEl.className = 'status-msg error';
+        statusEl.textContent = err.message;
+      }
+    }
+
     function cleanPaceString(rawVal) {
       const str = String(rawVal || '').trim();
       if (str.includes('1899-12-30T')) {
-        const timePart = str.split('T')[1]; // "06:04:00.000Z"
+        const timePart = str.split('T')[1];
         const parts = timePart.split(':');
         const mins = parseInt(parts[0], 10);
         const secs = parts[1];
@@ -675,7 +1011,6 @@
             return;
           }
 
-          // Sort South Africa (ZA) results to the top!
           const sorted = data.results.sort((a, b) => {
             if (a.country_code === 'ZA' && b.country_code !== 'ZA') return -1;
             if (b.country_code === 'ZA' && a.country_code !== 'ZA') return 1;
@@ -713,7 +1048,6 @@
       if (!e.target.closest('.loc-wrap')) locBox.classList.remove('open');
     });
 
-    // Resolve location (ZA-first) & fetch weather
     async function fetchWeatherAndEffort(locationName, dateStr, timeStr, distanceKm, totalMinutes) {
       const actualPaceDec = totalMinutes / distanceKm;
       let place = selectedPlace;
@@ -724,7 +1058,6 @@
         if (!geoData.results || geoData.results.length === 0) {
           throw new Error(`Could not find location "${locationName}". Try selecting from the dropdown list.`);
         }
-        // Prioritize ZA if available
         place = geoData.results.find(r => r.country_code === 'ZA') || geoData.results[0];
       }
 
@@ -829,7 +1162,6 @@
         document.getElementById('prevAdjPace').textContent = calc.adjustedPaceStr;
         document.getElementById('weatherPreview').classList.add('visible');
 
-        // Prefix pace with apostrophe so Google Sheets stores as plain text instead of 1899-12-30 Date
         const payload = {
           action: 'logRun',
           runnerName,
@@ -857,7 +1189,6 @@
         document.getElementById('diaryName').value = runnerName;
         document.getElementById('diaryPin').value = pin;
 
-        // Show clear confirmation pop-up modal!
         document.getElementById('modalSummaryText').innerHTML =
           `<strong>${distanceKm} km</strong> in <strong>${calc.resolvedName}</strong><br>` +
           `Actual: <strong>${calc.actualPaceStr}/km</strong> → Heat-Adjusted Effort: <strong style="color:#059669;">${calc.adjustedPaceStr}/km</strong>`;
@@ -901,12 +1232,12 @@
 
         const runs = data.runs.sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
-        // Populate Table with clean pace strings & clickable Google Maps links
         const tbody = document.getElementById('diaryTableBody');
         tbody.innerHTML = [...runs].reverse().map(r => {
           const cleanActual = cleanPaceString(r.actualPace);
           const cleanAdj = cleanPaceString(r.adjustedEffortPace);
-          const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.location)}`;
+          const queryLoc = String(r.location).replace(/^GPS\s*\(([^)]+)\)$/, '$1');
+          const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryLoc)}`;
           return `
             <tr>
               <td><strong>${String(r.date).slice(0, 10)}</strong></td>
@@ -919,7 +1250,6 @@
           `;
         }).join('');
 
-        // Render Clean Dual-Line Chart
         const ctx = document.getElementById('paceChart').getContext('2d');
         if (chartInstance) chartInstance.destroy();
 
