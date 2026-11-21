@@ -147,6 +147,52 @@
       border-radius: 999px;
     }
 
+    /* Collapsible Watch Export Guide */
+    .export-guide {
+      background: #F4F4F5;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .export-guide summary {
+      padding: 0.65rem 0.9rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--charcoal);
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .export-guide summary::-webkit-details-marker { display: none; }
+    .export-guide summary::after {
+      content: "▾";
+      font-size: 0.95rem;
+      color: var(--muted);
+      transition: transform 0.2s;
+    }
+    .export-guide[open] summary::after {
+      transform: rotate(180deg);
+    }
+    .export-guide-body {
+      padding: 0.75rem 0.9rem 0.9rem;
+      border-top: 1px solid var(--border);
+      background: #FFFFFF;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .export-platform {
+      margin-bottom: 0.6rem;
+    }
+    .export-platform:last-child { margin-bottom: 0; }
+    .export-platform strong {
+      color: var(--charcoal);
+      display: block;
+      margin-bottom: 0.1rem;
+    }
+
     .form-grid { display: grid; grid-template-columns: 1fr; gap: 0.85rem; }
     @media (min-width: 560px) {
       .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
@@ -390,13 +436,39 @@
         <div class="card-title">Log Your Run</div>
         <p class="card-subtitle">Import a watch file to auto-fill, or enter your run details manually below.</p>
 
-        <!-- WATCH FILE DROPZONE (.FIT / .GPX / .TCX) -->
+        <!-- ACTIVITY FILE DROPZONE (.FIT / .GPX / .TCX) -->
         <div id="watchDropzone" class="dropzone" onclick="document.getElementById('watchFileInput').click()">
           <input type="file" id="watchFileInput" accept=".fit,.gpx,.tcx,.xml" style="display:none;" />
-          <div class="dropzone-title">⌚ Import Garmin / Watch File (.FIT, .GPX, .TCX)</div>
-          <div class="dropzone-sub">Tap to browse or drag &amp; drop an activity file—auto-fills Date, Time, GPS Weather &amp; Distance</div>
+          <div class="dropzone-title">⌚ Import Activity File (.FIT, .GPX, .TCX)</div>
+          <div class="dropzone-sub">Works with any GPS watch or running app—auto-fills Date, Time, GPS Weather &amp; Distance</div>
           <span class="dropzone-badge">100% Private • Parsed Locally in Browser</span>
         </div>
+
+        <details class="export-guide">
+          <summary>How to export an activity file from your watch or app</summary>
+          <div class="export-guide-body">
+            <div class="export-platform">
+              <strong>Garmin Connect (Web)</strong>
+              Open your activity → click the <b>Gear icon (⚙)</b> top-right → select <b>Export File</b> (<code>.FIT</code>) or <b>Export to GPX</b>.
+            </div>
+            <div class="export-platform">
+              <strong>Strava (Web)</strong>
+              Open your run → click the <b>three dots (•••)</b> on the left menu → select <b>Export GPX</b> (or <b>Export Original</b>).
+            </div>
+            <div class="export-platform">
+              <strong>COROS App</strong>
+              Open the workout summary → tap the <b>Share / Export icon</b> top-right → choose <b>Export Data</b> → select <code>.FIT</code> or <code>.GPX</code>.
+            </div>
+            <div class="export-platform">
+              <strong>Polar Flow (Web)</strong>
+              Open your training session → scroll to the bottom → click <b>Export session</b> → choose <b>GPX</b> or <b>TCX</b>.
+            </div>
+            <div class="export-platform">
+              <strong>Suunto / Apple Watch / Samsung Health</strong>
+              Open the workout → tap <b>Share / Export</b> (or use <em>HealthFit</em> on iOS / <em>Samsung Health GPX export</em>) to save a <code>.GPX</code> or <code>.FIT</code> file, then upload it above.
+            </div>
+          </div>
+        </details>
         <div id="fileImportStatus" class="status-msg" style="margin-bottom:0.85rem;"></div>
 
         <form id="logForm" class="form-grid">
@@ -669,7 +741,7 @@
     }
 
     // ==========================================
-    // GARMIN / WATCH FILE PARSER (.FIT, .GPX, .TCX)
+    // ACTIVITY FILE PARSER (.FIT, .GPX, .TCX)
     // ==========================================
     const dropzone = document.getElementById('watchDropzone');
     const fileInput = document.getElementById('watchFileInput');
@@ -707,7 +779,6 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    // Lightweight Binary FIT Parser (extracts session/record timestamp, distance, duration, start GPS)
     function parseBinaryFit(arrayBuffer) {
       const view = new DataView(arrayBuffer);
       if (view.byteLength < 14) throw new Error("Invalid FIT file (too small).");
@@ -742,7 +813,7 @@
         const localType = header & 0x0F;
 
         if (isDef) {
-          offset++; // reserved
+          offset++;
           const arch = view.getUint8(offset++);
           const littleEndian = arch === 0;
           const globalMsgNum = view.getUint16(offset, littleEndian);
@@ -826,13 +897,12 @@
       const totalSec = sessionTimeS || (lastTimestamp && firstTimestamp ? (lastTimestamp - firstTimestamp) : 0);
 
       if (distKm <= 0 || totalSec <= 0) {
-        throw new Error("Could not extract distance/time from this .FIT file. Try exporting as .GPX or .TCX from Garmin Connect.");
+        throw new Error("Could not extract distance/time from this .FIT file. Try exporting as .GPX or .TCX instead.");
       }
 
       return { startDateObj, distKm, totalSec, lat: firstLat, lon: firstLon };
     }
 
-    // XML Parser for .GPX and .TCX files
     function parseXmlActivity(text) {
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, "text/xml");
