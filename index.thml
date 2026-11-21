@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Run Diary & Pace Matchmaker — The Runners' Playground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #DC1E26;
+      --primary-hover: #B91C1C;
+      --charcoal: #18181B;
+      --bg: #F8F9FA;
+      --card: #FFFFFF;
+      --emerald: #10B981;
+      --gold: #F59E0B;
+      --muted: #52525B;
+      --border: #E4E4E7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      color: var(--charcoal);
+      line-height: 1.5;
+      padding-bottom: 3rem;
+    }
+
+    h1, h2, h3, .brand-font {
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      background-color: var(--charcoal);
+      color: #FFFFFF;
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+    .top-bar a {
+      color: #FFFFFF;
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.1);
+      transition: background 0.2s;
+    }
+    .top-bar a:hover { background: rgba(255,255,255,0.2); }
+
+    /* Hero */
+    .hero {
+      background-color: var(--charcoal);
+      color: #FFFFFF;
+      padding: 1.5rem 1rem 2rem;
+      text-align: center;
+      border-bottom: 4px solid var(--primary);
+    }
+    .hero h1 {
+      font-size: 1.65rem;
+      font-weight: 800;
+      margin-bottom: 0.35rem;
+    }
+    .hero p {
+      color: #D4D4D8;
+      font-size: 0.92rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    /* Container & Tabs */
+    .container {
+      max-width: 760px;
+      margin: -1.25rem auto 0;
+      padding: 0 1rem;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      background: var(--card);
+      padding: 0.4rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-bottom: 1.25rem;
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      border: none;
+      background: transparent;
+      padding: 0.7rem 0.4rem;
+      border-radius: 8px;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 0.82rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #FFFFFF;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Cards & Forms */
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 1.25rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      border: 1px solid var(--border);
+      margin-bottom: 1.25rem;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-subtitle {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.85rem;
+    }
+
+    @media (min-width: 560px) {
+      .form-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.85rem;
+      }
+      .form-grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0.85rem;
+      }
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+      color: var(--charcoal);
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      background: #FFFFFF;
+      color: var(--charcoal);
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(220, 30, 38, 0.12);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 0.8rem 1rem;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.99); }
+    .btn-primary { background: var(--primary); color: #FFFFFF; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-dark { background: var(--charcoal); color: #FFFFFF; }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid var(--charcoal);
+      color: var(--charcoal);
+    }
+
+    /* Weather Preview Pill */
+    .weather-box {
+      background: #ECFDF5;
+      border: 1px solid #A7F3D0;
+      border-radius: 10px;
+      padding: 0.9rem;
+      margin-top: 0.85rem;
+      display: none;
+    }
+    .weather-box.visible { display: block; }
+    .weather-header {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #065F46;
+      margin-bottom: 0.4rem;
+    }
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      text-align: center;
+    }
+    .metric-pill {
+      background: #FFFFFF;
+      padding: 0.5rem 0.25rem;
+      border-radius: 8px;
+      border: 1px solid #D1FAE5;
+    }
+    .metric-val {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--charcoal);
+    }
+    .metric-lbl {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    /* Status Messages */
+    .status-msg {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      display: none;
+    }
+    .status-msg.info { display: block; background: #F4F4F5; color: var(--charcoal); }
+    .status-msg.success { display: block; background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+    .status-msg.error { display: block; background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; margin-top: 0.75rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+    th {
+      text-align: left;
+      background: #F4F4F5;
+      padding: 0.6rem;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    td {
+      padding: 0.65rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .badge-emerald {
+      background: #D1FAE5;
+      color: #065F46;
+      padding: 0.2rem 0.45rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+
+    /* Matchmaker Cards */
+    .match-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      background: #FAFAFA;
+    }
+    .match-info h4 { font-size: 0.98rem; margin-bottom: 0.15rem; }
+    .match-meta { font-size: 0.82rem; color: var(--muted); }
+    .match-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-top: 0.4rem;
+    }
+    .tag {
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+    }
+    .tag-gold { background: #FEF3C7; color: #92400E; }
+    .tag-red { background: #FEE2E2; color: #991B1B; }
+
+    /* Switch */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #F4F4F5;
+      padding: 0.75rem 0.9rem;
+      border-radius: 8px;
+      margin: 0.5rem 0;
+    }
+    .toggle-row input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--emerald);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <a href="https://sites.google.com/view/runners-playground" target="_blank" rel="noopener">← Runners' Playground</a>
+    <span style="color:#A1A1AA; font-size:0.78rem;">Metric (km • °C • min/km)</span>
+  </div>
+
+  <header class="hero">
+    <h1>Run Diary & Pace Matchmaker</h1>
+    <p>Log runs privately with automatic heat &amp; humidity effort adjustments—or opt in to find training buddies at your pace.</p>
+  </header>
+
+  <main class="container">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('log', this)">1. Log a Run</button>
+      <button class="tab-btn" onclick="switchTab('diary', this)">2. My Diary</button>
+      <button class="tab-btn" onclick="switchTab('match', this)">3. Matchmaker</button>
+    </div>
+
+    <!-- TAB 1: LOG A RUN -->
+    <section id="tab-log" class="tab-panel active">
+      <div class="card">
+        <div class="card-title">Log Your Run</div>
+        <p class="card-subtitle">Enter your Name &amp; 4-digit PIN so only you can unlock your diary later.</p>
+
+        <form id="logForm" class="form-grid">
+          <div class="form-grid-2">
+            <div>
+              <label for="runnerName">Runner Name / Nickname *</label>
+              <input type="text" id="runnerName" placeholder="e.g. Yolandi" required />
+            </div>
+            <div>
+              <label for="runnerPin">Private 4-Digit PIN *</label>
+              <input type="password" id="runnerPin" inputmode="numeric" maxlength="6" placeholder="e.g. 1234" required />
+            </div>
+          </div>
+
+          <div class="form-grid-3">
+            <div>
+              <label for="runDate">Date *</label>
+              <input type="date" id="runDate" required />
+            </div>
+            <div>
+              <label for="runTime">Start Time *</label>
+              <input type="time" id="runTime" value="06:00" required />
+            </div>
+            <div>
+              <label for="runLocation">Town / Suburb *</label>
+              <input type="text" id="runLocation" placeholder="e.g. White River" required />
+            </div>
+          </div>
+
+          <div class="form-grid-3">
+            <div>
+              <label for="runDistance">Distance (km) *</label>
+              <input type="number" id="runDistance" step="0.01" min="0.5" placeholder="e.g. 10.0" required />
+            </div>
+            <div>
+              <label for="runMinutes">Minutes *</label>
+              <input type="number" id="runMinutes" min="1" placeholder="e.g. 58" required />
+            </div>
+            <div>
+              <label for="runSeconds">Seconds</label>
+              <input type="number" id="runSeconds" min="0" max="59" value="0" />
+            </div>
+          </div>
+
+          <div>
+            <label for="runNotes">Quick Note (Optional)</label>
+            <input type="text" id="runNotes" placeholder="e.g. Hilly loop, felt strong in the heat" />
+          </div>
+
+          <button type="button" class="btn btn-outline" onclick="previewEffort()">Calculate Weather &amp; Effort Pace</button>
+
+          <div id="weatherPreview" class="weather-box">
+            <div class="weather-header" id="weatherLocLabel">Weather &amp; Effort Analysis</div>
+            <div class="metrics-row">
+              <div class="metric-pill">
+                <div class="metric-val" id="prevActualPace">--:--</div>
+                <div class="metric-lbl">Actual Pace (/km)</div>
+              </div>
+              <div class="metric-pill">
+                <div class="metric-val" id="prevWeather">--°C / --%</div>
+                <div class="metric-lbl">Temp &amp; Humidity</div>
+              </div>
+              <div class="metric-pill" style="border-color:#10B981;">
+                <div class="metric-val" style="color:#059669;" id="prevAdjPace">--:--</div>
+                <div class="metric-lbl">Heat-Adj Effort</div>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="saveRunBtn">Save Run to My Diary</button>
+          <div id="logStatus" class="status-msg"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 2: MY DIARY -->
+    <section id="tab-diary" class="tab-panel">
+      <div class="card">
+        <div class="card-title">Unlock Private Diary</div>
+        <p class="card-subtitle">Enter the exact Name &amp; PIN you used when logging your runs.</p>
+
+        <div class="form-grid-2" style="margin-bottom:0.85rem;">
+          <div>
+            <label for="diaryName">Runner Name</label>
+            <input type="text" id="diaryName" placeholder="e.g. Yolandi" />
+          </div>
+          <div>
+            <label for="diaryPin">4-Digit PIN</label>
+            <input type="password" id="diaryPin" inputmode="numeric" maxlength="6" placeholder="••••" />
+          </div>
+        </div>
+        <button type="button" class="btn btn-dark" onclick="loadDiary()">Load My Runs &amp; Chart</button>
+        <div id="diaryStatus" class="status-msg"></div>
+      </div>
+
+      <div id="diaryResults" style="display:none;">
+        <div class="card">
+          <div class="card-title">Actual Pace vs. Heat-Adjusted Effort</div>
+          <p class="card-subtitle">Lower line = faster pace (min/km). Emerald shows your true effort in cool conditions.</p>
+          <canvas id="paceChart" height="190"></canvas>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Run History</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Location</th>
+                  <th>Dist</th>
+                  <th>Actual</th>
+                  <th>Weather</th>
+                  <th>Effort Pace</th>
+                </tr>
+              </thead>
+              <tbody id="diaryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: PACE MATCHMAKER -->
+    <section id="tab-match" class="tab-panel">
+      <div class="card">
+        <div class="card-title">Find a Training Buddy</div>
+        <p class="card-subtitle">Honour system directory of runners open to company on training runs.</p>
+
+        <div class="form-grid-2" style="margin-bottom:0.85rem;">
+          <div>
+            <label for="filterDist">Filter by Distance</label>
+            <select id="filterDist" onchange="renderMatches()">
+              <option value="ALL">All Distances</option>
+              <option value="5 km">5 km</option>
+              <option value="10 km">10 km</option>
+              <option value="15–21.1 km">15–21.1 km</option>
+              <option value="Trail">Trail Runs</option>
+            </select>
+          </div>
+          <div>
+            <label for="filterPace">Filter by Pace Bracket</label>
+            <select id="filterPace" onchange="renderMatches()">
+              <option value="ALL">All Paces</option>
+              <option value="Sub 4:30/km">Sub 4:30/km</option>
+              <option value="4:30–5:15/km">4:30–5:15/km</option>
+              <option value="5:15–6:00/km">5:15–6:00/km</option>
+              <option value="6:00–6:45/km">6:00–6:45/km</option>
+              <option value="6:45+/km (Easy/Social)">6:45+/km (Easy/Social)</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="matchList">
+          <div class="status-msg info">Loading opted-in runners...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Your Matchmaker Settings</div>
+        <p class="card-subtitle">Use your Name &amp; PIN to list yourself—or toggle off anytime you want solo miles.</p>
+
+        <form id="profileForm" class="form-grid">
+          <div class="form-grid-2">
+            <div>
+              <label for="profName">Runner Name *</label>
+              <input type="text" id="profName" placeholder="e.g. Yolandi" required />
+            </div>
+            <div>
+              <label for="profPin">Your PIN *</label>
+              <input type="password" id="profPin" inputmode="numeric" maxlength="6" placeholder="••••" required />
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div>
+              <label for="profArea">Town / Suburb *</label>
+              <input type="text" id="profArea" placeholder="e.g. White River / Mbombela" required />
+            </div>
+            <div>
+              <label for="profDist">Preferred Distance *</label>
+              <select id="profDist">
+                <option value="5 km">5 km</option>
+                <option value="10 km" selected>10 km</option>
+                <option value="15–21.1 km">15–21.1 km</option>
+                <option value="Trail">Trail Runs</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div>
+              <label for="profPace">Comfortable Training Pace *</label>
+              <select id="profPace">
+                <option value="Sub 4:30/km">Sub 4:30/km</option>
+                <option value="4:30–5:15/km">4:30–5:15/km</option>
+                <option value="5:15–6:00/km">5:15–6:00/km</option>
+                <option value="6:00–6:45/km" selected>6:00–6:45/km</option>
+                <option value="6:45+/km (Easy/Social)">6:45+/km (Easy/Social)</option>
+              </select>
+            </div>
+            <div>
+              <label for="profContact">Instagram / Strava / Contact *</label>
+              <input type="text" id="profContact" placeholder="e.g. @yourhandle on IG" required />
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <div>
+              <strong style="font-size:0.9rem;">Show me in public directory</strong>
+              <div style="font-size:0.78rem; color:var(--muted);">Uncheck &amp; save to hide your profile anytime</div>
+            </div>
+            <input type="checkbox" id="profActive" checked />
+          </div>
+
+          <button type="submit" class="btn btn-primary">Update My Matchmaker Status</button>
+          <div id="profStatus" class="status-msg"></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyphZqhmeNoOidilBcOqi7wte4IssFWE5bni0ChNu0EYWehuIuiUiLm8cFjxtYktzWX/exec";
+
+    let latestCalc = null;
+    let allMatches = [];
+    let chartInstance = null;
+
+    // Default date to today
+    document.getElementById('runDate').valueAsDate = new Date();
+
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-' + tabId).classList.add('active');
+      btn.classList.add('active');
+      if (tabId === 'match' && allMatches.length === 0) {
+        fetchMatches();
+      }
+    }
+
+    function formatPace(decimalMinPerKm) {
+      const mins = Math.floor(decimalMinPerKm);
+      let secs = Math.round((decimalMinPerKm - mins) * 60);
+      if (secs === 60) {
+        return `${mins + 1}:00`;
+      }
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function paceStringToDecimal(paceStr) {
+      const parts = String(paceStr).split(':');
+      if (parts.length !== 2) return 0;
+      return Number(parts[0]) + Number(parts[1]) / 60;
+    }
+
+    // Open-Meteo Geocoding + Historical/Forecast Hourly Weather
+    async function fetchWeatherAndEffort(locationName, dateStr, timeStr, distanceKm, totalMinutes) {
+      const actualPaceDec = totalMinutes / distanceKm;
+
+      // 1. Geocode city/suburb
+      const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationName)}&count=1&language=en&format=json`);
+      const geoData = await geoRes.json();
+      if (!geoData.results || geoData.results.length === 0) {
+        throw new Error(`Could not find location "${locationName}". Try a nearby town or city.`);
+      }
+      const place = geoData.results[0];
+      const lat = place.latitude;
+      const lon = place.longitude;
+      const resolvedName = `${place.name}${place.country_code ? ', ' + place.country_code : ''}`;
+
+      // 2. Fetch hourly weather for that date
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,relative_humidity_2m&start_date=${dateStr}&end_date=${dateStr}&timezone=auto`;
+      const wRes = await fetch(weatherUrl);
+      const wData = await wRes.json();
+
+      let tempC = 20;
+      let humidityPct = 55;
+
+      if (wData.hourly && wData.hourly.time) {
+        const hourIdx = Math.min(23, Math.max(0, parseInt(timeStr.split(':')[0], 10) || 6));
+        tempC = wData.hourly.temperature_2m[hourIdx] ?? 20;
+        humidityPct = wData.hourly.relative_humidity_2m[hourIdx] ?? 55;
+      }
+
+      // 3. Heat & Humidity Effort Adjustment (baseline ideal = 15°C, 50% RH)
+      let slowdownFactor = 0;
+      if (tempC > 15) {
+        const tempExcess = tempC - 15;
+        const humidityFactor = humidityPct > 60 ? 1 + ((humidityPct - 60) / 100) : 1;
+        slowdownFactor = Math.min(0.18, tempExcess * 0.0045 * humidityFactor);
+      }
+
+      const adjustedPaceDec = actualPaceDec / (1 + slowdownFactor);
+
+      return {
+        resolvedName,
+        tempC: Math.round(tempC * 10) / 10,
+        humidityPct: Math.round(humidityPct),
+        actualPaceDec,
+        actualPaceStr: formatPace(actualPaceDec),
+        adjustedPaceDec,
+        adjustedPaceStr: formatPace(adjustedPaceDec)
+      };
+    }
+
+    async function previewEffort() {
+      const loc = document.getElementById('runLocation').value.trim();
+      const date = document.getElementById('runDate').value;
+      const time = document.getElementById('runTime').value;
+      const dist = parseFloat(document.getElementById('runDistance').value);
+      const mins = parseFloat(document.getElementById('runMinutes').value) || 0;
+      const secs = parseFloat(document.getElementById('runSeconds').value) || 0;
+      const totalMin = mins + secs / 60;
+
+      const statusEl = document.getElementById('logStatus');
+      if (!loc || !date || !dist || totalMin <= 0) {
+        statusEl.className = 'status-msg error';
+        statusEl.textContent = 'Please fill in Date, Location, Distance, and Time first.';
+        return;
+      }
+
+      statusEl.className = 'status-msg info';
+      statusEl.textContent = 'Fetching historical weather & calculating effort...';
+
+      try {
+        const calc = await fetchWeatherAndEffort(loc, date, time, dist, totalMin);
+        latestCalc = calc;
+        document.getElementById('weatherLocLabel').textContent = `Weather at ${calc.resolvedName} (${date} • ${time})`;
+        document.getElementById('prevActualPace').textContent = calc.actualPaceStr;
+        document.getElementById('prevWeather').textContent = `${calc.tempC}°C / ${calc.humidityPct}%`;
+        document.getElementById('prevAdjPace').textContent = calc.adjustedPaceStr;
+        document.getElementById('weatherPreview').classList.add('visible');
+        statusEl.style.display = 'none';
+      } catch (err) {
+        statusEl.className = 'status-msg error';
+        statusEl.textContent = err.message;
+      }
+    }
+
+    document.getElementById('logForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const runnerName = document.getElementById('runnerName').value.trim();
+      const pin = document.getElementById('runnerPin').value.trim();
+      const date = document.getElementById('runDate').value;
+      const startTime = document.getElementById('runTime').value;
+      const loc = document.getElementById('runLocation').value.trim();
+      const distanceKm = parseFloat(document.getElementById('runDistance').value);
+      const mins = parseFloat(document.getElementById('runMinutes').value) || 0;
+      const secs = parseFloat(document.getElementById('runSeconds').value) || 0;
+      const durationMin = Math.round((mins + secs / 60) * 100) / 100;
+      const notes = document.getElementById('runNotes').value.trim();
+
+      const statusEl = document.getElementById('logStatus');
+      const btn = document.getElementById('saveRunBtn');
+      btn.disabled = true;
+      statusEl.className = 'status-msg info';
+      statusEl.textContent = 'Calculating weather effort and saving to your diary...';
+
+      try {
+        const calc = await fetchWeatherAndEffort(loc, date, startTime, distanceKm, durationMin);
+
+        document.getElementById('weatherLocLabel').textContent = `Weather at ${calc.resolvedName} (${date} • ${startTime})`;
+        document.getElementById('prevActualPace').textContent = calc.actualPaceStr;
+        document.getElementById('prevWeather').textContent = `${calc.tempC}°C / ${calc.humidityPct}%`;
+        document.getElementById('prevAdjPace').textContent = calc.adjustedPaceStr;
+        document.getElementById('weatherPreview').classList.add('visible');
+
+        const payload = {
+          action: 'logRun',
+          runnerName,
+          pin,
+          date,
+          startTime,
+          location: calc.resolvedName,
+          distanceKm,
+          durationMin,
+          actualPace: calc.actualPaceStr,
+          tempC: calc.tempC,
+          humidityPct: calc.humidityPct,
+          adjustedEffortPace: calc.adjustedPaceStr,
+          notes
+        };
+
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        statusEl.className = 'status-msg success';
+        statusEl.textContent = `Saved! Actual pace ${calc.actualPaceStr}/km → Heat-adjusted effort ${calc.adjustedPaceStr}/km.`;
+        document.getElementById('diaryName').value = runnerName;
+        document.getElementById('diaryPin').value = pin;
+      } catch (err) {
+        statusEl.className = 'status-msg error';
+        statusEl.textContent = 'Error saving run: ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    async function loadDiary() {
+      const name = document.getElementById('diaryName').value.trim();
+      const pin = document.getElementById('diaryPin').value.trim();
+      const statusEl = document.getElementById('diaryStatus');
+
+      if (!name || !pin) {
+        statusEl.className = 'status-msg error';
+        statusEl.textContent = 'Please enter both your Runner Name and PIN.';
+        return;
+      }
+
+      statusEl.className = 'status-msg info';
+      statusEl.textContent = 'Unlocking your private run diary...';
+
+      try {
+        const res = await fetch(`${SCRIPT_URL}?action=getDiary&name=${encodeURIComponent(name)}&pin=${encodeURIComponent(pin)}`);
+        const data = await res.json();
+
+        if (data.status !== 'ok' || !data.runs || data.runs.length === 0) {
+          statusEl.className = 'status-msg error';
+          statusEl.textContent = 'No runs found for that Name + PIN combination yet.';
+          document.getElementById('diaryResults').style.display = 'none';
+          return;
+        }
+
+        statusEl.style.display = 'none';
+        document.getElementById('diaryResults').style.display = 'block';
+
+        const runs = data.runs.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+        const tbody = document.getElementById('diaryTableBody');
+        tbody.innerHTML = [...runs].reverse().map(r => `
+          <tr>
+            <td><strong>${String(r.date).slice(0, 10)}</strong></td>
+            <td>${r.location}</td>
+            <td>${r.distanceKm} km</td>
+            <td>${r.actualPace}/km</td>
+            <td>${r.tempC}°C • ${r.humidityPct}%</td>
+            <td><span class="badge-emerald">${r.adjustedEffortPace}/km</span></td>
+          </tr>
+        `).join('');
+
+        const ctx = document.getElementById('paceChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: runs.map(r => String(r.date).slice(0, 10)),
+            datasets: [
+              {
+                label: 'Actual Pace (min/km)',
+                data: runs.map(r => paceStringToDecimal(r.actualPace)),
+                borderColor: '#18181B',
+                backgroundColor: '#18181B',
+                tension: 0.25,
+                borderWidth: 2.5
+              },
+              {
+                label: 'Heat-Adjusted Effort (min/km)',
+                data: runs.map(r => paceStringToDecimal(r.adjustedEffortPace)),
+                borderColor: '#10B981',
+                backgroundColor: '#10B981',
+                tension: 0.25,
+                borderWidth: 2.5
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: {
+                reverse: true,
+                ticks: {
+                  callback: val => formatPace(val)
+                }
+              }
+            },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: ctx => `${ctx.dataset.label}: ${formatPace(ctx.parsed.y)}/km`
+                }
+              }
+            }
+          }
+        });
+      } catch (err) {
+        statusEl.className = 'status-msg error';
+        statusEl.textContent = 'Could not load diary: ' + err.message;
+      }
+    }
+
+    async function fetchMatches() {
+      const listEl = document.getElementById('matchList');
+      try {
+        const res = await fetch(`${SCRIPT_URL}?action=getMatches`);
+        const data = await res.json();
+        allMatches = data.profiles || [];
+        renderMatches();
+      } catch (err) {
+        listEl.innerHTML = `<div class="status-msg error">Could not load directory right now.</div>`;
+      }
+    }
+
+    function renderMatches() {
+      const listEl = document.getElementById('matchList');
+      const distFilter = document.getElementById('filterDist').value;
+      const paceFilter = document.getElementById('filterPace').value;
+
+      const filtered = allMatches.filter(p => {
+        const dOk = distFilter === 'ALL' || p.preferredDistances === distFilter;
+        const pOk = paceFilter === 'ALL' || p.paceBracket === paceFilter;
+        return dOk && pOk;
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="status-msg info">No runners listed for that filter yet—be the first to opt in below!</div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(p => `
+        <div class="match-card">
+          <div class="match-info">
+            <h4>${p.runnerName}</h4>
+            <div class="match-meta">📍 ${p.area} • 💬 ${p.contactHandle}</div>
+            <div class="match-tags">
+              <span class="tag tag-red">${p.preferredDistances}</span>
+              <span class="tag tag-gold">${p.paceBracket}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('profileForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusEl = document.getElementById('profStatus');
+      statusEl.className = 'status-msg info';
+      statusEl.textContent = 'Updating your Pace Matchmaker status...';
+
+      const payload = {
+        action: 'saveProfile',
+        runnerName: document.getElementById('profName').value.trim(),
+        pin: document.getElementById('profPin').value.trim(),
+        area: document.getElementById('profArea').value.trim(),
+        preferredDistances: document.getElementById('profDist').value,
+        paceBracket: document.getElementById('profPace').value,
+        contactHandle: document.getElementById('profContact').value.trim(),
+        activeToggle: document.getElementById('profActive').checked
+      };
+
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        statusEl.className = 'status-msg success';
+        statusEl.textContent = payload.activeToggle
+          ? 'You are now listed in the Pace Matchmaker directory!'
+          : 'Your profile has been hidden from the public directory.';
+        setTimeout(fetchMatches, 1200);
+      } catch (err) {
+        statusEl.className = 'status-msg error';
+        statusEl.textContent = 'Error updating profile: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
